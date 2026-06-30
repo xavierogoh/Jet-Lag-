@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Chasers</title>
+<style>
+  @font-face {
+    font-family: 'JBMono';
+    src: local('JetBrains Mono');
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #0e1012;
+    color: #e8e6e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    height: 100%;
+    overscroll-behavior: none;
+  }
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #15171a;
+  }
+  .mono { font-family: 'SF Mono', 'JetBrains Mono', 'Courier New', monospace; }
+
+  /* ---- Coin header ---- */
+  .coin-header {
+    padding: 22px 20px 16px;
+    background: #1a1d21;
+    border-bottom: 1px solid #2a2d32;
+    position: relative;
+  }
+  .coin-label {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8a8d92;
+    margin: 0 0 4px;
+  }
+  .coin-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .coin-value {
+    font-size: 40px;
+    font-weight: 700;
+    color: #e8a33d;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+  .coin-unit {
+    font-size: 14px;
+    color: #6b6e73;
+    font-weight: 500;
+  }
+  .coin-bar-track {
+    height: 4px;
+    background: #2a2d32;
+    border-radius: 2px;
+    margin-top: 14px;
+    overflow: hidden;
+  }
+  .coin-bar-fill {
+    height: 100%;
+    background: #e8a33d;
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+  .coin-bar-fill.draining {
+    background: #e0524a;
+  }
+  .active-timer-pill {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: rgba(224,82,74,0.12);
+    border: 1px solid rgba(224,82,74,0.3);
+    border-radius: 8px;
+    font-size: 13px;
+    color: #f08983;
+  }
+  .active-timer-pill.show { display: flex; }
+  .pulse-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #e0524a;
+    animation: pulse 1.4s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  /* ---- Main grid (dashboard) ---- */
+  .screen { display: none; flex: 1; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  .grid-buttons {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    padding: 20px;
+  }
+  .tile {
+    background: #1c1f24;
+    border: 1px solid #2a2d32;
+    border-radius: 14px;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 130px;
+    cursor: pointer;
+    transition: transform 0.1s ease, background 0.15s ease;
+  }
+  .tile:active { transform: scale(0.96); background: #22262c; }
+  .tile-icon {
+    font-size: 26px;
+    margin-bottom: 4px;
+  }
+  .tile-icon svg { width: 28px; height: 28px; display: block; }
+  .tile-label {
+    font-size: 16px;
+    font-weight: 700;
+    color: #e8e6e0;
+  }
+  .tile-sub {
+    font-size: 12px;
+    color: #8a8d92;
+    margin-top: 2px;
+  }
+  .tile.timer .tile-icon svg { color: #4fb6e8; }
+  .tile.challenges .tile-icon svg { color: #2bb47a; }
+  .tile.calculator .tile-icon svg { color: #b48ee8; }
+  .tile.powerups .tile-icon svg { color: #e0524a; }
+
+  .reset-row {
+    padding: 14px 20px 22px;
+    text-align: left;
+  }
+  .reset-link {
+    font-size: 12px;
+    color: #6b6e73;
+    background: none;
+    border: none;
+    text-decoration: underline;
+    padding: 6px 0;
+    cursor: pointer;
+  }
+  .reset-link:active { color: #e0524a; }
+
+  /* ---- Sub pages ---- */
+  .page-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid #2a2d32;
+    background: #1a1d21;
+  }
+  .back-btn {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: #22262c;
+    border: 1px solid #2a2d32;
+    color: #e8e6e0;
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .back-btn:active { background: #2a2d32; }
+  .page-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #e8e6e0;
+  }
+
+  .page-body { padding: 20px; flex: 1; }
+
+  /* Transport option list (timer + calculator) */
+  .option-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .option-row {
+    background: #1c1f24;
+    border: 1px solid #2a2d32;
+    border-radius: 12px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .option-row:active { background: #22262c; }
+  .option-row.selected {
+    border-color: #4fb6e8;
+    background: rgba(79,182,232,0.08);
+  }
+  .option-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #e8e6e0;
+  }
+  .option-rate {
+    font-size: 13px;
+    color: #8a8d92;
+    margin-top: 2px;
+  }
+  .option-rate .mono { color: #e8a33d; font-weight: 600; }
+
+  /* Timer running view */
+  .timer-running {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    gap: 24px;
+  }
+  .timer-running.show { display: flex; }
+  .timer-mode-label {
+    font-size: 14px;
+    color: #8a8d92;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .timer-clock {
+    font-size: 56px;
+    font-weight: 700;
+    color: #e8e6e0;
+    letter-spacing: 0.02em;
+  }
+  .timer-spend-rate {
+    font-size: 14px;
+    color: #e8a33d;
+  }
+  .timer-stop-btn {
+    width: 100%;
+    padding: 16px;
+    background: #e0524a;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .timer-stop-btn:active { background: #c4453e; }
+  .insufficient-note {
+    font-size: 13px;
+    color: #e0524a;
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  /* Challenges (add coins) */
+  .add-coin-card {
+    background: #1c1f24;
+    border: 1px solid #2a2d32;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .add-coin-card label {
+    display: block;
+    font-size: 13px;
+    color: #8a8d92;
+    margin-bottom: 8px;
+  }
+  .add-coin-input {
+    width: 100%;
+    padding: 14px;
+    font-size: 22px;
+    font-weight: 700;
+    background: #0e1012;
+    border: 1px solid #2a2d32;
+    border-radius: 10px;
+    color: #2bb47a;
+    margin-bottom: 14px;
+    text-align: center;
+  }
+  .add-coin-input:focus {
+    outline: none;
+    border-color: #2bb47a;
+  }
+  .add-coin-btn {
+    width: 100%;
+    padding: 16px;
+    background: #2bb47a;
+    color: #0e1012;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .add-coin-btn:active { background: #259a68; }
+  .add-coin-btn:disabled {
+    background: #2a2d32;
+    color: #6b6e73;
+    cursor: not-allowed;
+  }
+  .confirm-flash {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 14px;
+    color: #2bb47a;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .confirm-flash.show { opacity: 1; }
+
+  /* Calculator result */
+  .calc-input-block { margin-top: 18px; }
+  .calc-input-block label {
+    display: block;
+    font-size: 13px;
+    color: #8a8d92;
+    margin-bottom: 8px;
+  }
+  .calc-input {
+    width: 100%;
+    padding: 14px;
+    font-size: 20px;
+    font-weight: 700;
+    background: #0e1012;
+    border: 1px solid #2a2d32;
+    border-radius: 10px;
+    color: #e8e6e0;
+    text-align: center;
+  }
+  .calc-input:focus { outline: none; border-color: #b48ee8; }
+  .calc-result {
+    margin-top: 18px;
+    background: #1c1f24;
+    border: 1px solid #2a2d32;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+  .calc-result-label {
+    font-size: 12px;
+    color: #8a8d92;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+  .calc-result-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: #b48ee8;
+  }
+  .calc-note {
+    font-size: 12px;
+    color: #6b6e73;
+    text-align: center;
+    margin-top: 10px;
+  }
+
+  /* Powerups */
+  .powerup-card {
+    background: #1c1f24;
+    border: 1px solid #2a2d32;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .powerup-card:active { background: #22262c; }
+  .powerup-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #e8e6e0;
+    margin-bottom: 4px;
+  }
+  .powerup-desc {
+    font-size: 12px;
+    color: #8a8d92;
+    margin-bottom: 10px;
+  }
+  .powerup-cost {
+    font-size: 16px;
+    font-weight: 700;
+    color: #e0524a;
+  }
+  .powerup-cost.affordable { color: #e8a33d; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 24px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box {
+    background: #1c1f24;
+    border: 1px solid #2a2d32;
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 340px;
+  }
+  .modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #e8e6e0;
+    margin: 0 0 8px;
+  }
+  .modal-body {
+    font-size: 14px;
+    color: #b0b2b6;
+    margin: 0 0 20px;
+    line-height: 1.5;
+  }
+  .modal-body .mono { color: #e8a33d; font-weight: 600; }
+  .modal-btn-row {
+    display: flex;
+    gap: 10px;
+  }
+  .modal-btn {
+    flex: 1;
+    padding: 13px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+  }
+  .modal-btn.no {
+    background: #2a2d32;
+    color: #e8e6e0;
+  }
+  .modal-btn.no:active { background: #33373d; }
+  .modal-btn.yes {
+    background: #e8a33d;
+    color: #1a1d21;
+  }
+  .modal-btn.yes:active { background: #d1922f; }
+  .modal-btn.yes.danger {
+    background: #e0524a;
+    color: #fff;
+  }
+  .modal-btn.yes.danger:active { background: #c4453e; }
+  .modal-btn.yes:disabled {
+    background: #2a2d32;
+    color: #6b6e73;
+    cursor: not-allowed;
+  }
+
+  /* ---- Welcome modal ---- */
+  .welcome-box {
+    text-align: center;
+    padding: 28px 24px;
+  }
+  .welcome-icon {
+    width: 52px; height: 52px;
+    margin: 0 auto 18px;
+    border-radius: 14px;
+    background: rgba(232,163,61,0.12);
+    border: 1px solid rgba(232,163,61,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .welcome-icon svg { width: 26px; height: 26px; color: #e8a33d; }
+  .welcome-title {
+    font-size: 19px;
+    font-weight: 700;
+    color: #e8e6e0;
+    margin: 0 0 10px;
+    line-height: 1.3;
+  }
+  .welcome-body {
+    font-size: 14px;
+    color: #b0b2b6;
+    margin: 0 0 22px;
+    line-height: 1.6;
+  }
+  .welcome-body .mono { color: #e8a33d; font-weight: 600; }
+  .welcome-start-btn {
+    width: 100%;
+    padding: 15px;
+    background: #e8a33d;
+    color: #1a1d21;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .welcome-start-btn:active { background: #d1922f; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #2a2d32;
+    color: #e8e6e0;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.25s ease;
+    pointer-events: none;
+    z-index: 200;
+    white-space: nowrap;
+    border: 1px solid #3a3d42;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="coin-header">
+    <p class="coin-label">Coins</p>
+    <div class="coin-row">
+      <span class="coin-value mono" id="coinValue">1000</span>
+    </div>
+    <div class="coin-bar-track"><div class="coin-bar-fill" id="coinBarFill" style="width:100%"></div></div>
+    <div class="active-timer-pill" id="activeTimerPill">
+      <span class="pulse-dot"></span>
+      <span id="activeTimerText">Train running — 50/min</span>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="screen active" id="screen-dashboard">
+    <div class="grid-buttons">
+      <div class="tile challenges" onclick="goTo('challenges')">
+        <div class="tile-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></div>
+        <div>
+          <div class="tile-label">Challenges</div>
+          <div class="tile-sub">Add coins</div>
+        </div>
+      </div>
+      <div class="tile timer" onclick="goTo('timer')">
+        <div class="tile-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 1h6M12 1v3"/></svg></div>
+        <div>
+          <div class="tile-label">Timer</div>
+          <div class="tile-sub">Travel & spend</div>
+        </div>
+      </div>
+      <div class="tile calculator" onclick="goTo('calculator')">
+        <div class="tile-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h2M8 15h2M12 11h2M12 15h2M16 11h0M16 15h0"/></svg></div>
+        <div>
+          <div class="tile-label">Calculator</div>
+          <div class="tile-sub">Estimate cost</div>
+        </div>
+      </div>
+      <div class="tile powerups" onclick="goTo('powerups')">
+        <div class="tile-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg></div>
+        <div>
+          <div class="tile-label">Powerups</div>
+          <div class="tile-sub">Spend big</div>
+        </div>
+      </div>
+    </div>
+    <div class="reset-row">
+      <button class="reset-link" onclick="openResetModal()">Reset game</button>
+    </div>
+  </div>
+
+  <!-- TIMER PAGE -->
+  <div class="screen" id="screen-timer">
+    <div class="page-header">
+      <button class="back-btn" onclick="goTo('dashboard')">‹</button>
+      <span class="page-title">Timer</span>
+    </div>
+    <div class="page-body">
+
+      <div id="timerSelectView">
+        <div class="option-list">
+          <div class="option-row" data-mode="train" onclick="selectTimerMode('train','Train',50)">
+            <div><div class="option-name">Train</div><div class="option-rate"><span class="mono">50</span> coins / min</div></div>
+          </div>
+          <div class="option-row" data-mode="express" onclick="selectTimerMode('express','Express train',100)">
+            <div><div class="option-name">Express train</div><div class="option-rate"><span class="mono">100</span> coins / min</div></div>
+          </div>
+          <div class="option-row" data-mode="tram" onclick="selectTimerMode('tram','Tram',25)">
+            <div><div class="option-name">Tram</div><div class="option-rate"><span class="mono">25</span> coins / min</div></div>
+          </div>
+          <div class="option-row" data-mode="bus" onclick="selectTimerMode('bus','Bus',15)">
+            <div><div class="option-name">Bus</div><div class="option-rate"><span class="mono">15</span> coins / min</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timer-running" id="timerRunningView">
+        <div class="timer-mode-label" id="timerModeLabel">Train</div>
+        <div class="timer-clock mono" id="timerClock">00:00</div>
+        <div class="timer-spend-rate mono" id="timerSpendInfo">50 coins/min · 0 spent</div>
+        <button class="timer-stop-btn" onclick="stopTimer()">Stop timer</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CHALLENGES PAGE -->
+  <div class="screen" id="screen-challenges">
+    <div class="page-header">
+      <button class="back-btn" onclick="goTo('dashboard')">‹</button>
+      <span class="page-title">Challenges</span>
+    </div>
+    <div class="page-body">
+      <div class="add-coin-card">
+        <label for="addCoinInput">Coins earned from challenge</label>
+        <input type="number" id="addCoinInput" class="add-coin-input" placeholder="0" inputmode="numeric" min="0">
+        <button class="add-coin-btn" id="addCoinBtn" onclick="addChallengeCoins()">Add to wallet</button>
+        <div class="confirm-flash" id="addCoinFlash">Added to wallet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CALCULATOR PAGE -->
+  <div class="screen" id="screen-calculator">
+    <div class="page-header">
+      <button class="back-btn" onclick="goTo('dashboard')">‹</button>
+      <span class="page-title">Calculator</span>
+    </div>
+    <div class="page-body">
+      <div class="option-list" id="calcOptionList">
+        <div class="option-row" data-mode="train" onclick="selectCalcMode('train','Train',50)">
+          <div><div class="option-name">Train</div><div class="option-rate"><span class="mono">50</span> coins / min</div></div>
+        </div>
+        <div class="option-row" data-mode="express" onclick="selectCalcMode('express','Express train',100)">
+          <div><div class="option-name">Express train</div><div class="option-rate"><span class="mono">100</span> coins / min</div></div>
+        </div>
+        <div class="option-row" data-mode="tram" onclick="selectCalcMode('tram','Tram',25)">
+          <div><div class="option-name">Tram</div><div class="option-rate"><span class="mono">25</span> coins / min</div></div>
+        </div>
+        <div class="option-row" data-mode="bus" onclick="selectCalcMode('bus','Bus',15)">
+          <div><div class="option-name">Bus</div><div class="option-rate"><span class="mono">15</span> coins / min</div></div>
+        </div>
+      </div>
+
+      <div class="calc-input-block" id="calcInputBlock" style="display:none;">
+        <label for="calcMinutesInput">Minutes traveling</label>
+        <input type="number" id="calcMinutesInput" class="calc-input" placeholder="0" inputmode="numeric" min="0" oninput="updateCalcResult()">
+      </div>
+
+      <div class="calc-result" id="calcResultBlock" style="display:none;">
+        <div class="calc-result-label">Estimated cost</div>
+        <div class="calc-result-value mono" id="calcResultValue">0</div>
+      </div>
+      <div class="calc-note" id="calcNote" style="display:none;">This is an estimate only — your coin total is not affected.</div>
+    </div>
+  </div>
+
+  <!-- POWERUPS PAGE -->
+  <div class="screen" id="screen-powerups">
+    <div class="page-header">
+      <button class="back-btn" onclick="goTo('dashboard')">‹</button>
+      <span class="page-title">Powerups</span>
+    </div>
+    <div class="page-body">
+      <div class="powerup-card" onclick="selectPowerup('locate','Find out where chasers are',1000)">
+        <div class="powerup-name">Find out where chasers are</div>
+        <div class="powerup-desc">Reveal chaser locations</div>
+        <div class="powerup-cost mono">1000 coins</div>
+      </div>
+      <div class="powerup-card" onclick="selectPowerup('cloak','Turn off tracker for 10 minutes',1500)">
+        <div class="powerup-name">Turn off tracker for 10 minutes</div>
+        <div class="powerup-desc">Go dark for 10 minutes</div>
+        <div class="powerup-cost mono">1500 coins</div>
+      </div>
+      <div class="powerup-card" onclick="selectPowerup('freeze','Chasers stop moving',2000)">
+        <div class="powerup-name">Chasers stop moving</div>
+        <div class="powerup-desc">Freeze every chaser in place</div>
+        <div class="powerup-cost mono">2000 coins</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Generic confirm modal (timer start / powerup buy) -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-box">
+    <p class="modal-title" id="confirmModalTitle">Start timer?</p>
+    <p class="modal-body" id="confirmModalBody"></p>
+    <div class="modal-btn-row">
+      <button class="modal-btn no" onclick="closeConfirmModal()">No</button>
+      <button class="modal-btn yes" id="confirmModalYesBtn" onclick="confirmModalYes()">Yes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset modal -->
+<div class="modal-overlay" id="resetModal">
+  <div class="modal-box">
+    <p class="modal-title">Reset game?</p>
+    <p class="modal-body">This sets your coins back to <span class="mono">1000</span> and stops any running timer. This can't be undone.</p>
+    <div class="modal-btn-row">
+      <button class="modal-btn no" onclick="closeResetModal()">Cancel</button>
+      <button class="modal-btn yes danger" onclick="confirmReset()">Reset</button>
+    </div>
+  </div>
+</div>
+
+<!-- Welcome modal -->
+<div class="modal-overlay" id="welcomeModal">
+  <div class="modal-box welcome-box">
+    <div class="welcome-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></div>
+    <p class="welcome-title">Welcome to the Unofficial JetLag Wallet</p>
+    <p class="welcome-body">You're starting with <span class="mono">1,000</span> coins. Spend them on transport and powerups — choose wisely.</p>
+    <button class="welcome-start-btn" onclick="closeWelcomeModal()">Let's go</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STARTING_COINS = 1000;
+const STORAGE_KEY = 'chasers_game_state_v1';
+
+const TRANSPORT_RATES = { train: 50, express: 100, tram: 25, bus: 15 };
+const TRANSPORT_NAMES = { train: 'Train', express: 'Express train', tram: 'Tram', bus: 'Bus' };
+
+let state = {
+  coins: STARTING_COINS,
+  hasSeenWelcome: false,
+  timer: {
+    running: false,
+    mode: null,
+    modeName: null,
+    rate: 0,
+    startedAt: null,
+    elapsedSeconds: 0,
+    spent: 0
+  }
+};
+
+let tickInterval = null;
+let pendingAction = null; // { type: 'startTimer'|'buyPowerup', payload }
+let selectedCalcMode = null;
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.coins === 'number') state.coins = parsed.coins;
+      if (typeof parsed.hasSeenWelcome === 'boolean') state.hasSeenWelcome = parsed.hasSeenWelcome;
+      if (parsed.timer) state.timer = parsed.timer;
+    }
+  } catch (e) {}
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {}
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function renderCoins() {
+  document.getElementById('coinValue').textContent = state.coins.toLocaleString();
+  const pct = Math.max(0, Math.min(100, (state.coins / STARTING_COINS) * 100));
+  const fill = document.getElementById('coinBarFill');
+  fill.style.width = pct + '%';
+  fill.classList.toggle('draining', state.coins <= 200);
+}
+
+function renderActiveTimerPill() {
+  const pill = document.getElementById('activeTimerPill');
+  const text = document.getElementById('activeTimerText');
+  if (state.timer.running) {
+    pill.classList.add('show');
+    text.textContent = state.timer.modeName + ' running — ' + state.timer.rate + '/min';
+  } else {
+    pill.classList.remove('show');
+  }
+}
+
+function goTo(screenName) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + screenName).classList.add('active');
+
+  if (screenName === 'timer') {
+    if (state.timer.running) {
+      showTimerRunningView();
+    } else {
+      showTimerSelectView();
+    }
+  }
+  if (screenName === 'calculator') {
+    resetCalculator();
+  }
+  if (screenName === 'challenges') {
+    document.getElementById('addCoinInput').value = '';
+    document.getElementById('addCoinFlash').classList.remove('show');
+  }
+}
+
+/* ---------------- TIMER ---------------- */
+
+function showTimerSelectView() {
+  document.getElementById('timerSelectView').style.display = 'block';
+  document.getElementById('timerRunningView').classList.remove('show');
+}
+
+function showTimerRunningView() {
+  document.getElementById('timerSelectView').style.display = 'none';
+  document.getElementById('timerRunningView').classList.add('show');
+  document.getElementById('timerModeLabel').textContent = state.timer.modeName;
+  updateTimerClockDisplay();
+}
+
+function selectTimerMode(mode, name, rate) {
+  if (state.coins < rate) {
+    showToast("Not enough coins for 1 minute of " + name.toLowerCase());
+    return;
+  }
+  pendingAction = { type: 'startTimer', mode, name, rate };
+  document.getElementById('confirmModalTitle').textContent = 'Start timer?';
+  document.getElementById('confirmModalBody').innerHTML =
+    name + ' costs <span class="mono">' + rate + '</span> coins per minute. Start the timer now?';
+  const yesBtn = document.getElementById('confirmModalYesBtn');
+  yesBtn.classList.remove('danger');
+  yesBtn.disabled = false;
+  openConfirmModal();
+}
+
+function startTimerConfirmed(mode, name, rate) {
+  state.timer = {
+    running: true,
+    mode, modeName: name, rate,
+    startedAt: Date.now(),
+    elapsedSeconds: 0,
+    spent: 0
+  };
+  saveState();
+  renderActiveTimerPill();
+  showTimerRunningView();
+  startTickLoop();
+}
+
+function stopTimer() {
+  state.timer.running = false;
+  stopTickLoop();
+  const spent = state.timer.spent;
+  state.timer = { running: false, mode: null, modeName: null, rate: 0, startedAt: null, elapsedSeconds: 0, spent: 0 };
+  saveState();
+  renderActiveTimerPill();
+  renderCoins();
+  showToast('Timer stopped' + (spent > 0 ? ' — ' + spent + ' coins spent' : ''));
+  showTimerSelectView();
+}
+
+function startTickLoop() {
+  stopTickLoop();
+  tickInterval = setInterval(tick, 1000);
+}
+function stopTickLoop() {
+  if (tickInterval) { clearInterval(tickInterval); tickInterval = null; }
+}
+
+function tick() {
+  if (!state.timer.running) return;
+  state.timer.elapsedSeconds += 1;
+  updateTimerClockDisplay();
+
+  if (state.timer.elapsedSeconds % 60 === 0) {
+    const rate = state.timer.rate;
+    if (state.coins <= 0) {
+      forceStopNoFunds();
+      return;
+    }
+    if (state.coins < rate) {
+      state.coins = 0;
+      state.timer.spent += rate;
+      renderCoins();
+      saveState();
+      forceStopNoFunds();
+      return;
+    }
+    state.coins -= rate;
+    state.timer.spent += rate;
+    renderCoins();
+    saveState();
+    updateTimerClockDisplay();
+  }
+}
+
+function forceStopNoFunds() {
+  state.timer.running = false;
+  stopTickLoop();
+  saveState();
+  renderActiveTimerPill();
+  showToast("Out of coins — timer stopped");
+  state.timer = { running: false, mode: null, modeName: null, rate: 0, startedAt: null, elapsedSeconds: 0, spent: 0 };
+  saveState();
+  showTimerSelectView();
+}
+
+function updateTimerClockDisplay() {
+  const total = state.timer.elapsedSeconds;
+  const mm = String(Math.floor(total / 60)).padStart(2, '0');
+  const ss = String(total % 60).padStart(2, '0');
+  document.getElementById('timerClock').textContent = mm + ':' + ss;
+  document.getElementById('timerSpendInfo').textContent =
+    state.timer.rate + ' coins/min · ' + state.timer.spent.toLocaleString() + ' spent';
+}
+
+/* ---------------- CHALLENGES ---------------- */
+
+function addChallengeCoins() {
+  const input = document.getElementById('addCoinInput');
+  const val = parseInt(input.value, 10);
+  if (!val || val <= 0) {
+    showToast('Enter a number greater than 0');
+    return;
+  }
+  state.coins += val;
+  saveState();
+  renderCoins();
+  input.value = '';
+  const flash = document.getElementById('addCoinFlash');
+  flash.textContent = 'Added ' + val.toLocaleString() + ' coins to wallet';
+  flash.classList.add('show');
+  setTimeout(() => flash.classList.remove('show'), 2200);
+}
+
+/* ---------------- CALCULATOR ---------------- */
+
+function selectCalcMode(mode, name, rate) {
+  selectedCalcMode = { mode, name, rate };
+  document.querySelectorAll('#calcOptionList .option-row').forEach(row => {
+    row.classList.toggle('selected', row.dataset.mode === mode);
+  });
+  document.getElementById('calcInputBlock').style.display = 'block';
+  document.getElementById('calcMinutesInput').value = '';
+  document.getElementById('calcResultBlock').style.display = 'block';
+  document.getElementById('calcNote').style.display = 'block';
+  updateCalcResult();
+}
+
+function updateCalcResult() {
+  if (!selectedCalcMode) return;
+  const mins = parseFloat(document.getElementById('calcMinutesInput').value) || 0;
+  const cost = Math.round(mins * selectedCalcMode.rate);
+  document.getElementById('calcResultValue').textContent = cost.toLocaleString();
+}
+
+function resetCalculator() {
+  selectedCalcMode = null;
+  document.querySelectorAll('#calcOptionList .option-row').forEach(row => row.classList.remove('selected'));
+  document.getElementById('calcInputBlock').style.display = 'none';
+  document.getElementById('calcResultBlock').style.display = 'none';
+  document.getElementById('calcNote').style.display = 'none';
+}
+
+/* ---------------- POWERUPS ---------------- */
+
+function selectPowerup(id, name, cost) {
+  pendingAction = { type: 'buyPowerup', id, name, cost };
+  document.getElementById('confirmModalTitle').textContent = 'Buy powerup?';
+  const afford = state.coins >= cost;
+  document.getElementById('confirmModalBody').innerHTML =
+    '"' + name + '" costs <span class="mono">' + cost.toLocaleString() + '</span> coins.' +
+    (afford ? '' : ' You don\'t have enough coins for this yet.');
+  const yesBtn = document.getElementById('confirmModalYesBtn');
+  yesBtn.classList.add('danger');
+  yesBtn.disabled = !afford;
+  openConfirmModal();
+}
+
+/* ---------------- MODALS ---------------- */
+
+function openConfirmModal() {
+  document.getElementById('confirmModal').classList.add('show');
+}
+function closeConfirmModal() {
+  document.getElementById('confirmModal').classList.remove('show');
+  pendingAction = null;
+}
+function confirmModalYes() {
+  if (!pendingAction) { closeConfirmModal(); return; }
+  if (pendingAction.type === 'startTimer') {
+    startTimerConfirmed(pendingAction.mode, pendingAction.name, pendingAction.rate);
+  } else if (pendingAction.type === 'buyPowerup') {
+    if (state.coins >= pendingAction.cost) {
+      state.coins -= pendingAction.cost;
+      saveState();
+      renderCoins();
+      showToast('Purchased: ' + pendingAction.name);
+    }
+  }
+  document.getElementById('confirmModal').classList.remove('show');
+  pendingAction = null;
+}
+
+function openResetModal() { document.getElementById('resetModal').classList.add('show'); }
+function closeResetModal() { document.getElementById('resetModal').classList.remove('show'); }
+
+function openWelcomeModal() { document.getElementById('welcomeModal').classList.add('show'); }
+function closeWelcomeModal() {
+  document.getElementById('welcomeModal').classList.remove('show');
+  state.hasSeenWelcome = true;
+  saveState();
+}
+
+function confirmReset() {
+  stopTickLoop();
+  state = {
+    coins: STARTING_COINS,
+    hasSeenWelcome: false,
+    timer: { running: false, mode: null, modeName: null, rate: 0, startedAt: null, elapsedSeconds: 0, spent: 0 }
+  };
+  saveState();
+  renderCoins();
+  renderActiveTimerPill();
+  closeResetModal();
+  goTo('dashboard');
+  showToast('Game reset');
+  openWelcomeModal();
+}
+
+/* ---------------- INIT ---------------- */
+
+function init() {
+  loadState();
+
+  if (state.timer.running && state.timer.startedAt) {
+    const elapsedSinceStart = Math.floor((Date.now() - state.timer.startedAt) / 1000);
+    const minutesPassed = Math.floor(elapsedSinceStart / 60) - Math.floor(state.timer.elapsedSeconds / 60);
+    state.timer.elapsedSeconds = elapsedSinceStart;
+    if (minutesPassed > 0) {
+      for (let i = 0; i < minutesPassed; i++) {
+        if (state.coins <= 0) break;
+        const rate = state.timer.rate;
+        if (state.coins < rate) { state.coins = 0; state.timer.spent += rate; break; }
+        state.coins -= rate;
+        state.timer.spent += rate;
+      }
+    }
+    if (state.coins <= 0) {
+      state.timer = { running: false, mode: null, modeName: null, rate: 0, startedAt: null, elapsedSeconds: 0, spent: 0 };
+    }
+    saveState();
+  }
+
+  renderCoins();
+  renderActiveTimerPill();
+
+  if (!state.hasSeenWelcome) {
+    openWelcomeModal();
+  }
+
+  if (state.timer.running) {
+    showTimerRunningView();
+    startTickLoop();
+  }
+}
+
+init();
+</script>
+</body>
+</html>
