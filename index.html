@@ -1050,9 +1050,7 @@ function confirmReset() {
 
 /* ---------------- INIT ---------------- */
 
-function init() {
-  loadState();
-
+function catchUpTimer() {
   if (state.timer.running && state.timer.startedAt) {
     const elapsedSinceStart = Math.floor((Date.now() - state.timer.startedAt) / 1000);
     const minutesPassed = Math.floor(elapsedSinceStart / 60) - Math.floor(state.timer.elapsedSeconds / 60);
@@ -1068,9 +1066,30 @@ function init() {
     }
     if (state.coins <= 0) {
       state.timer = { running: false, mode: null, modeName: null, rate: 0, startedAt: null, elapsedSeconds: 0, spent: 0 };
+      stopTickLoop();
+      renderActiveTimerPill();
+      showToast("Out of coins — timer stopped");
+      showTimerSelectView();
     }
     saveState();
+    renderCoins();
+    if (state.timer.running) updateTimerClockDisplay();
   }
+}
+
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible') {
+    catchUpTimer();
+  }
+});
+
+window.addEventListener('pageshow', function() {
+  catchUpTimer();
+});
+
+function init() {
+  loadState();
+  catchUpTimer();
 
   renderCoins();
   renderActiveTimerPill();
